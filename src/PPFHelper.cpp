@@ -38,11 +38,13 @@
 //
 // Author: Tolga Birdal <tbirdal AT gmail.com>
 
-#include "Precomp.h"
+//#include "Precomp.h"
+//#include <Eigen/Dense>
+#include <PPFHelpers.h>
 
 
 namespace ppf_match_3d {
-
+    // TODO flann适配
     typedef cv::flann::L2<float> Distance_32F;
     typedef cv::flann::GenericIndex<Distance_32F> FlannIndex;
 
@@ -79,7 +81,8 @@ namespace ppf_match_3d {
         std::ifstream ifs(fileName);
 
         if (!ifs.is_open())
-            CV_Error(Error::StsError, String("Error opening input file: ") + String(fileName) + "\n");
+            std::cerr << "Error opening input file: " << fileName <<std::endl;
+//            CV_Error(Error::StsError, String("Error opening input file: ") + String(fileName) + "\n");
 
         std::string str;
         while (str.substr(0, 10) != "end_header") {
@@ -100,15 +103,18 @@ namespace ppf_match_3d {
                     }
                 }
             } else if (tokens.size() > 1 && tokens[0] == "format" && tokens[1] != "ascii")
-                CV_Error(Error::StsBadArg, String("Cannot read file, only ascii ply format is currently supported..."));
+                std::cerr << "Cannot read file, only ascii ply format is currently supported..." << std::endl;
+//                CV_Error(Error::StsBadArg, String("Cannot read file, only ascii ply format is currently supported..."));
             std::getline(ifs, str);
         }
         withNormals &= has_normals;
 
-        cloud = Mat(numVertices, withNormals ? 6 : 3, CV_32FC1);
+//        cloud = Mat(numVertices, withNormals ? 6 : 3, CV_32FC1);
+        cloud = Mat.resize(numVertices, withNormals ? 6 : 3);
 
         for (int i = 0; i < numVertices; i++) {
-            float *data = cloud.ptr<float>(i);
+//            float *data = cloud.ptr<float>(i);
+            float *data = cloud.data()+i;
             int col = 0;
             for (; col < (withNormals ? 6 : 3); ++col) {
                 ifs >> data[col];
@@ -136,14 +142,15 @@ namespace ppf_match_3d {
         std::ofstream outFile(FileName);
 
         if (!outFile.is_open())
-            CV_Error(Error::StsError, String("Error opening output file: ") + String(FileName) + "\n");
+            std::cerr << "Error opening output file: " << FileName << std::endl;
+//            CV_Error(Error::StsError, String("Error opening output file: ") + String(FileName) + "\n");
 
         ////
         // Header
         ////
 
-        const int pointNum = (int) PC.rows;
-        const int vertNum = (int) PC.cols;
+        const int pointNum = (int) PC.rows();
+        const int vertNum = (int) PC.cols();
 
         outFile << "ply" << std::endl;
         outFile << "format ascii 1.0" << std::endl;
@@ -163,8 +170,8 @@ namespace ppf_match_3d {
         ////
 
         for (int pi = 0; pi < pointNum; ++pi) {
-            const float *point = PC.ptr<float>(pi);
-
+//            const float *point = PC.ptr<float>(pi);
+            const float *point = PC.data()+pi;
             outFile << point[0] << " " << point[1] << " " << point[2];
 
             if (vertNum == 6) {
@@ -181,14 +188,15 @@ namespace ppf_match_3d {
         std::ofstream outFile(FileName);
 
         if (!outFile.is_open())
-            CV_Error(Error::StsError, String("Error opening output file: ") + String(FileName) + "\n");
+            std::cerr << "Error opening output file: " << FileName << std::endl;
+//            CV_Error(Error::StsError, String("Error opening output file: ") + String(FileName) + "\n");
 
         ////
         // Header
         ////
 
-        const int pointNum = (int) PC.rows;
-        const int vertNum = (int) PC.cols;
+        const int pointNum = (int) PC.rows();
+        const int vertNum = (int) PC.cols();
         const bool hasNormals = vertNum == 6;
 
         outFile << "ply" << std::endl;
@@ -209,7 +217,8 @@ namespace ppf_match_3d {
         ////
 
         for (int pi = 0; pi < pointNum; ++pi) {
-            const float *point = PC.ptr<float>(pi);
+//            const float *point = PC.ptr<float>(pi);
+            const float *point = PC.data()+pi;
 
             outFile << point[0] << " " << point[1] << " " << point[2];
 
@@ -226,31 +235,35 @@ namespace ppf_match_3d {
     }
 
     Mat samplePCUniform(Mat PC, int sampleStep) {
-        int numRows = PC.rows / sampleStep;
-        Mat sampledPC = Mat(numRows, PC.cols, PC.type());
+        int numRows = PC.rows() / sampleStep;
+//        Mat sampledPC = Mat(numRows, PC.cols, PC.type());
+        //TODO 需要测试
+        Mat sampledPC(numRows, PC.cols());
 
         int c = 0;
-        for (int i = 0; i < PC.rows && c < numRows; i += sampleStep) {
-            PC.row(i).copyTo(sampledPC.row(c++));
+        for (int i = 0; i < PC.rows() && c < numRows; i += sampleStep) {
+//            PC.row(i).copyTo(sampledPC.row(c++));
+            sampledPC.row(c++) = PC.row(i);
         }
 
         return sampledPC;
     }
 
     Mat samplePCUniformInd(Mat PC, int sampleStep, std::vector<int> &indices) {
-        int numRows = cvRound((double) PC.rows / (double) sampleStep);
+        int numRows = round((double) PC.rows() / (double) sampleStep);
         indices.resize(numRows);
-        Mat sampledPC = Mat(numRows, PC.cols, PC.type());
+        Mat sampledPC(numRows, PC.cols());
 
         int c = 0;
-        for (int i = 0; i < PC.rows && c < numRows; i += sampleStep) {
+        for (int i = 0; i < PC.rows() && c < numRows; i += sampleStep) {
             indices[c] = i;
-            PC.row(i).copyTo(sampledPC.row(c++));
+//            PC.row(i).copyTo(sampledPC.row(c++));
+            sampledPC.row(c++) = PC.row(i);
         }
 
         return sampledPC;
     }
-
+//TODO Flann
     void *indexPCFlann(Mat pc) {
         Mat dest_32f;
         pc.colRange(0, 3).copyTo(dest_32f);
@@ -291,8 +304,8 @@ namespace ppf_match_3d {
 
         // OpenMP might seem like a good idea, but it didn't speed this up for me
         //#pragma omp parallel for
-        for (int i = 0; i < pc.rows; i++) {
-            const float *point = pc.ptr<float>(i);
+        for (int i = 0; i < pc.rows(); i++) {
+            const float *point = pc.data()+i;
 
             // quantize a point
             const int xCell = (int) ((float) numSamplesDim * (point[0] - xrange[0]) / xr);
@@ -310,7 +323,8 @@ namespace ppf_match_3d {
             numPoints += (map[i].size() > 0);
         }
 
-        Mat pcSampled = Mat(numPoints, pc.cols, CV_32F);
+//        Mat pcSampled = Mat(numPoints, pc.cols, CV_32F);
+        Mat pcSampled(numPoints, pc.cols());
         int c = 0;
 
         for (unsigned int i = 0; i < map.size(); i++) {
@@ -334,7 +348,7 @@ namespace ppf_match_3d {
 
                     for (int j = 0; j < cn; j++) {
                         const int ptInd = curCell[j];
-                        float *point = pc.ptr<float>(ptInd);
+                        float *point = pc.data()+ptInd;
                         const double dx = point[0] - xc;
                         const double dy = point[1] - yc;
                         const double dz = point[2] - zc;
@@ -368,7 +382,7 @@ namespace ppf_match_3d {
                 } else {
                     for (int j = 0; j < cn; j++) {
                         const int ptInd = curCell[j];
-                        float *point = pc.ptr<float>(ptInd);
+                        float *point = pc.data()+ptInd;
 
                         px += (double) point[0];
                         py += (double) point[1];
@@ -427,10 +441,11 @@ namespace ppf_match_3d {
 
 // compute the standard bounding box
     void computeBboxStd(Mat pc, Vec2f &xRange, Vec2f &yRange, Vec2f &zRange) {
-        Mat pcPts = pc.colRange(0, 3);
-        int num = pcPts.rows;
+//        Mat pcPts = pc.colRange(0, 3);
+        Mat pcPts = pc.leftCols(3);
+        int num = pcPts.rows();
 
-        float *points = (float *) pcPts.data;
+        float *points = (float *) pcPts.data();
 
         xRange[0] = points[0];
         xRange[1] = points[0];
@@ -440,7 +455,7 @@ namespace ppf_match_3d {
         zRange[1] = points[2];
 
         for (int ind = 0; ind < num; ind++) {
-            const float *row = (float *) (pcPts.data + (ind * pcPts.step));
+            const float *row = (float *) (pcPts.data() + (ind * pcPts.cols()));
             const float x = row[0];
             const float y = row[1];
             const float z = row[2];
@@ -466,9 +481,16 @@ namespace ppf_match_3d {
         double minVal = 0, maxVal = 0;
 
         Mat x, y, z, pcn;
-        pc.col(0).copyTo(x);
-        pc.col(1).copyTo(y);
-        pc.col(2).copyTo(z);
+//        pc.col(0).copyTo(x);
+//        pc.col(1).copyTo(y);
+//        pc.col(2).copyTo(z);
+        x = pc.col(0);
+        y = pc.col(1);
+        z = pc.col(2);
+
+//        float cx = (float) cv::mean(x)[0];
+//        float cy = (float) cv::mean(y)[0];
+//        float cz = (float) cv::mean(z)[0];
 
         float cx = (float) cv::mean(x)[0];
         float cy = (float) cv::mean(y)[0];

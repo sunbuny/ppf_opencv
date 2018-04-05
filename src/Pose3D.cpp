@@ -50,8 +50,8 @@ namespace ppf_match_3d {
         poseToRT(pose, R, t);
 
         // compute the angle
-        const double trace = cv::trace(R);
-
+//        const double trace = cv::trace(R);
+        const double trace = R.trace();
         if (fabs(trace - 3) <= EPS) {
             angle = 0;
         } else if (fabs(trace + 1) <= EPS) {
@@ -68,8 +68,8 @@ namespace ppf_match_3d {
         rtToPose(NewR, NewT, pose);
 
         // compute the angle
-        const double trace = cv::trace(NewR);
-
+//        const double trace = cv::trace(NewR);
+        const double trace = NewR.trace();
         if (fabs(trace - 3) <= EPS) {
             angle = 0;
         } else if (fabs(trace + 1) <= EPS) {
@@ -91,8 +91,8 @@ namespace ppf_match_3d {
         rtToPose(NewR, NewT, pose);
 
         // compute the angle
-        const double trace = cv::trace(NewR);
-
+//        const double trace = cv::trace(NewR);
+        const double trace = NewR.trace();
         if (fabs(trace - 3) <= EPS) {
             angle = 0;
         } else {
@@ -112,8 +112,8 @@ namespace ppf_match_3d {
         poseToRT(PoseFull, R, t);
 
         // compute the angle
-        const double trace = cv::trace(R);
-
+//        const double trace = cv::trace(R);
+        const double trace = R.trace();
         if (fabs(trace - 3) <= EPS) {
             angle = 0;
         } else if (fabs(trace + 1) <= EPS) {
@@ -129,8 +129,8 @@ namespace ppf_match_3d {
     }
 
     Pose3DPtr Pose3D::clone() {
-        Ptr <Pose3D> new_pose(new Pose3D(alpha, modelIndex, numVotes));
-
+//        Ptr <Pose3D> new_pose(new Pose3D(alpha, modelIndex, numVotes));
+        std::shared_ptr <Pose3D> new_pose(new Pose3D(alpha, modelIndex, numVotes));
         new_pose->pose = this->pose;
         new_pose->q = q;
         new_pose->t = t;
@@ -151,9 +151,10 @@ namespace ppf_match_3d {
         fwrite(&angle, sizeof(double), 1, f);
         fwrite(&numVotes, sizeof(int), 1, f);
         fwrite(&modelIndex, sizeof(int), 1, f);
-        fwrite(pose.val, sizeof(double) * 16, 1, f);
-        fwrite(t.val, sizeof(double) * 3, 1, f);
-        fwrite(q.val, sizeof(double) * 4, 1, f);
+        // TODO 需要测试
+        fwrite(pose.data(), sizeof(double) * 16, 1, f);
+        fwrite(t.data(), sizeof(double) * 3, 1, f);
+        fwrite(q.data(), sizeof(double) * 4, 1, f);
         fwrite(&residual, sizeof(double), 1, f);
         return 0;
     }
@@ -166,9 +167,9 @@ namespace ppf_match_3d {
             status = fread(&angle, sizeof(double), 1, f);
             status = fread(&numVotes, sizeof(int), 1, f);
             status = fread(&modelIndex, sizeof(int), 1, f);
-            status = fread(pose.val, sizeof(double) * 16, 1, f);
-            status = fread(t.val, sizeof(double) * 3, 1, f);
-            status = fread(q.val, sizeof(double) * 4, 1, f);
+            status = fread(pose.data(), sizeof(double) * 16, 1, f);
+            status = fread(t.data(), sizeof(double) * 3, 1, f);
+            status = fread(q.data(), sizeof(double) * 4, 1, f);
             status = fread(&residual, sizeof(double), 1, f);
             return 0;
         }
@@ -204,6 +205,7 @@ namespace ppf_match_3d {
     void PoseCluster3D::addPose(Pose3DPtr newPose) {
         poseList.push_back(newPose);
         this->numVotes += newPose->numVotes;
+
     };
 
     int PoseCluster3D::writePoseCluster(FILE *f) {

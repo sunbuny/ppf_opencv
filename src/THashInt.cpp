@@ -38,7 +38,7 @@
 //
 // Author: Tolga Birdal <tbirdal AT gmail.com>
 
-#include "Precomp.h"
+#include "THashInt.h"
 
 
 namespace ppf_match_3d {

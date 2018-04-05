@@ -1,10 +1,18 @@
 #pragma once
 
 //TODO 转为eigen
+#include <string>
+#include <cstdio>
+#include <cstdlib>
+#include <math.h>
+#include <ctime>
+#include <iostream>
+#include <fstream>
+#include <iostream>
+#include <c_utils.h>
 
 
-    namespace ppf_match_3d
-    {
+namespace ppf_match_3d {
 
 //! @addtogroup surface_matching
 //! @{
@@ -16,14 +24,14 @@
  *  and whether it should be loaded or not
  *  @return Returns the matrix on successfull load
  */
-         Mat loadPLYSimple(const char* fileName, int withNormals = 0);
+    Mat loadPLYSimple(const char *fileName, int withNormals = 0);
 
 /**
  *  @brief Write a point cloud to PLY file
  *  @param [in] PC Input point cloud
  *  @param [in] fileName The PLY model file to write
 */
-         void writePLY(Mat PC, const char* fileName);
+    void writePLY(Mat PC, const char *fileName);
 
 /**
 *  @brief Used for debbuging pruposes, writes a point cloud to a PLY file with the tip
@@ -31,10 +39,11 @@
 *  @param [in] PC Input point cloud
 *  @param [in] fileName The PLY model file to write
 */
-         void writePLYVisibleNormals(Mat PC, const char* fileName);
+    void writePLYVisibleNormals(Mat PC, const char *fileName);
 
-        Mat samplePCUniform(Mat PC, int sampleStep);
-        Mat samplePCUniformInd(Mat PC, int sampleStep, std::vector<int>& indices);
+    Mat samplePCUniform(Mat PC, int sampleStep);
+
+    Mat samplePCUniformInd(Mat PC, int sampleStep, std::vector<int> &indices);
 
 /**
  *  Sample a point cloud using uniform steps
@@ -49,17 +58,22 @@
  *  by the distance to the origin. This parameter enables/disables the use of weighting.
  *  @return Sampled point cloud
 */
-         Mat samplePCByQuantization(Mat pc, Vec2f& xrange, Vec2f& yrange, Vec2f& zrange, float sample_step_relative, int weightByCenter=0);
+    Mat samplePCByQuantization(Mat pc, Vec2f &xrange, Vec2f &yrange, Vec2f &zrange, float sample_step_relative,
+                               int weightByCenter = 0);
 
-        void computeBboxStd(Mat pc, Vec2f& xRange, Vec2f& yRange, Vec2f& zRange);
+    void computeBboxStd(Mat pc, Vec2f &xRange, Vec2f &yRange, Vec2f &zRange);
 
-        void* indexPCFlann(Mat pc);
-        void destroyFlann(void* flannIndex);
-        void queryPCFlann(void* flannIndex, Mat& pc, Mat& indices, Mat& distances);
-        void queryPCFlann(void* flannIndex, Mat& pc, Mat& indices, Mat& distances, const int numNeighbors);
+    void *indexPCFlann(Mat pc);
 
-        Mat normalizePCCoeff(Mat pc, float scale, float* Cx, float* Cy, float* Cz, float* MinVal, float* MaxVal);
-        Mat transPCCoeff(Mat pc, float scale, float Cx, float Cy, float Cz, float MinVal, float MaxVal);
+    void destroyFlann(void *flannIndex);
+
+    void queryPCFlann(void *flannIndex, Mat &pc, Mat &indices, Mat &distances);
+
+    void queryPCFlann(void *flannIndex, Mat &pc, Mat &indices, Mat &distances, const int numNeighbors);
+
+    Mat normalizePCCoeff(Mat pc, float scale, float *Cx, float *Cy, float *Cz, float *MinVal, float *MaxVal);
+
+    Mat transPCCoeff(Mat pc, float scale, float Cx, float Cy, float Cz, float MinVal, float MaxVal);
 
 /**
  *  Transforms the point cloud with a given a homogeneous 4x4 pose matrix (in double precision)
@@ -69,20 +83,20 @@
  *  @param [in] Pose 4x4 pose matrix, but linearized in row-major form.
  *  @return Transformed point cloud
 */
-         Mat transformPCPose(Mat pc, const Matx44d& Pose);
+    Mat transformPCPose(Mat pc, const Matx44d &Pose);
 
 /**
  *  Generate a random 4x4 pose matrix
  *  @param [out] Pose The random pose
 */
-         void getRandomPose(Matx44d& Pose);
+    void getRandomPose(Matx44d &Pose);
 
 /**
  *  Adds a uniform noise in the given scale to the input point cloud
  *  @param [in] pc Input point cloud (CV_32F family).
  *  @param [in] scale Input scale of the noise. The larger the scale, the more noisy the output
 */
-         Mat addNoisePC(Mat pc, double scale);
+    Mat addNoisePC(Mat pc, double scale);
 
 /**
  *  @brief Compute the normals of an arbitrary point cloud
@@ -98,8 +112,13 @@
  *  @param [in] viewpoint
  *  @return Returns 0 on success
  */
-         int computeNormalsPC3d(const Mat& PC, CV_OUT Mat& PCNormals, const int NumNeighbors, const bool FlipViewpoint, const Vec3f& viewpoint);
+    int computeNormalsPC3d(const Mat &PC,  Mat &
+    PCNormals,
+    const int NumNeighbors,
+    const bool FlipViewpoint,
+    const Vec3f &viewpoint
+    );
 
 //! @}
 
-    } // namespace ppf_match_3d
+} // namespace ppf_match_3d

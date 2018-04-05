@@ -2,9 +2,10 @@
 
 #include <vector>
 #include <string>
-#include <boost/shared_ptr.hpp>
-#include "Precomp.h"
-
+#include <memory>
+#include <iostream>
+//#include "Precomp.h"
+#include <c_utils.h>
 
 //TODO 转为eigen
 
