@@ -78,5 +78,9 @@ int main() {
         pose3DPtr->numVotes = 0;
         pose3DPtr->printPose();
     }
+
+    {
+
+    }
     return 0;
 }

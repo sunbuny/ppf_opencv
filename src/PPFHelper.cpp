@@ -492,22 +492,29 @@ namespace ppf_match_3d {
 //        float cy = (float) cv::mean(y)[0];
 //        float cz = (float) cv::mean(z)[0];
 
-        float cx = (float) cv::mean(x)[0];
-        float cy = (float) cv::mean(y)[0];
-        float cz = (float) cv::mean(z)[0];
+        float cx = (float) x.colwise().sum()/x.rows();
+        float cy = (float) y.colwise().sum()/y.rows();
+        float cz = (float) z.colwise().sum()/z.rows();
 
-        cv::minMaxIdx(pc, &minVal, &maxVal);
+//        cv::minMaxIdx(pc, &minVal, &maxVal);
 
-        x = x - cx;
-        y = y - cy;
-        z = z - cz;
-        pcn.create(pc.rows, 3, CV_32FC1);
-        x.copyTo(pcn.col(0));
-        y.copyTo(pcn.col(1));
-        z.copyTo(pcn.col(2));
+        x.array() -= cx;
+        y.array() -= cy;
+        z.array() -= cz;
+//        pcn.create(pc.rows, 3, CV_32FC1);
+        pcn.resize(pc.rows(),3);
+//        x.copyTo(pcn.col(0));
+//        y.copyTo(pcn.col(1));
+//        z.copyTo(pcn.col(2));
+        pcn.col(0) = x;
+        pcn.col(1) = y;
+        pcn.col(2) = z;
+//todo need to be tested
+//        cv::minMaxIdx(pcn, &minVal, &maxVal);
+        minVal = pcn.minCoeff();
+        maxVal = pcn.maxCoeff();
 
-        cv::minMaxIdx(pcn, &minVal, &maxVal);
-        pcn = (float) scale * (pcn) / ((float) maxVal - (float) minVal);
+        pcn *= (float) scale/ ((float) maxVal - (float) minVal);
 
         *MinVal = (float) minVal;
         *MaxVal = (float) maxVal;
@@ -520,17 +527,25 @@ namespace ppf_match_3d {
 
     Mat transPCCoeff(Mat pc, float scale, float Cx, float Cy, float Cz, float MinVal, float MaxVal) {
         Mat x, y, z, pcn;
-        pc.col(0).copyTo(x);
-        pc.col(1).copyTo(y);
-        pc.col(2).copyTo(z);
+//        pc.col(0).copyTo(x);
+//        pc.col(1).copyTo(y);
+//        pc.col(2).copyTo(z);
+        x = pc.col(0);
+        y = pc.col(1);
+        z = pc.col(2);
 
-        x = x - Cx;
-        y = y - Cy;
-        z = z - Cz;
-        pcn.create(pc.rows, 3, CV_32FC1);
-        x.copyTo(pcn.col(0));
-        y.copyTo(pcn.col(1));
-        z.copyTo(pcn.col(2));
+        x.array() -= Cx;
+        y.array() -= Cy;
+        z.array() -= Cz;
+
+//        pcn.create(pc.rows, 3, CV_32FC1);
+        pcn.resize(pc.rows(),3);
+//        x.copyTo(pcn.col(0));
+//        y.copyTo(pcn.col(1));
+//        z.copyTo(pcn.col(2));
+        pcn.col(0) = x;
+        pcn.col(1) = y;
+        pcn.col(2) = z;
 
         pcn = (float) scale * (pcn) / ((float) MaxVal - (float) MinVal);
 
@@ -538,8 +553,8 @@ namespace ppf_match_3d {
     }
 
     Mat transformPCPose(Mat pc, const Matx44d &Pose) {
-        Mat pct = Mat(pc.rows, pc.cols, CV_32F);
-
+//        Mat pct = Mat(pc.rows, pc.cols, CV_32F);
+        Mat pct(pc.rows(),pc.cols());
         Matx33d R;
         Vec3d t;
         poseToRT(Pose, R, t);
@@ -548,15 +563,17 @@ namespace ppf_match_3d {
 #pragma omp parallel for
 #endif
         for (int i = 0; i < pc.rows; i++) {
-            const float *pcData = pc.ptr<float>(i);
+//            const float *pcData = pc.ptr<float>(i);
+            const float *pcData = pc.data()+i;
             const Vec3f n1(&pcData[3]);
 
             Vec4d p = Pose * Vec4d(pcData[0], pcData[1], pcData[2], 1);
-            Vec3d p2(p.val);
-
+//            Vec3d p2(p.val);
+            Vec3d p2(p);
             // p2[3] should normally be 1
             if (fabs(p[3]) > EPS) {
-                Mat((1.0 / p[3]) * p2).reshape(1, 1).convertTo(pct.row(i).colRange(0, 3), CV_32F);
+//                Mat((1.0 / p[3]) * p2).reshape(1, 1).convertTo(pct.row(i).colRange(0, 3), CV_32F);
+                //todo Mat中插值
             }
 
             // If the point cloud has normals,
