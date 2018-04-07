@@ -50,7 +50,7 @@ namespace ppf_match_3d {
 
     void shuffle(int *array, size_t n);
 
-    Mat genRandomMat(int rows, int cols, double mean, double stddev, int type);
+    Mat genRandomMat(int rows, int cols, double mean, double stddev);
 
     void getRandQuat(Vec4d &q);
 
@@ -574,18 +574,20 @@ namespace ppf_match_3d {
             if (fabs(p[3]) > EPS) {
 //                Mat((1.0 / p[3]) * p2).reshape(1, 1).convertTo(pct.row(i).colRange(0, 3), CV_32F);
                 //todo Mat中插值
+                pct.row(i).head(3) =  (1.0 / p[3]) *p2;
             }
 
             // If the point cloud has normals,
             // then rotate them as well
-            if (pc.cols == 6) {
+            if (pc.cols() == 6) {
                 Vec3d n(n1), n2;
 
                 n2 = R * n;
-                double nNorm = cv::norm(n2);
-
+//                double nNorm = cv::norm(n2);
+                double nNorm = n2.norm();
                 if (nNorm > EPS) {
-                    Mat((1.0 / nNorm) * n2).reshape(1, 1).convertTo(pct.row(i).colRange(3, 6), CV_32F);
+//                    Mat((1.0 / nNorm) * n2).reshape(1, 1).convertTo(pct.row(i).colRange(3, 6), CV_32F);
+                    pct.row(i).tail(3) = (1.0 / nNorm) * n2;
                 }
             }
         }
@@ -593,12 +595,15 @@ namespace ppf_match_3d {
         return pct;
     }
 
-    Mat genRandomMat(int rows, int cols, double mean, double stddev, int type) {
-        Mat meanMat = mean * Mat::ones(1, 1, type);
-        Mat sigmaMat = stddev * Mat::ones(1, 1, type);
-        RNG rng(time(0));
-        Mat matr(rows, cols, type);
-        rng.fill(matr, RNG::NORMAL, meanMat, sigmaMat);
+    Mat genRandomMat(int rows, int cols, double mean, double stddev) {
+//        Mat meanMat = mean * Mat::ones(1, 1, type);
+//        Mat sigmaMat = stddev * Mat::ones(1, 1, type);
+//        RNG rng(time(0));
+
+//        Mat matr(rows, cols, type);
+//        rng.fill(matr, RNG::NORMAL, meanMat, sigmaMat);
+        Mat matr(rows,cols);
+        matr.setRandom();
 
         return matr;
     }
@@ -609,7 +614,8 @@ namespace ppf_match_3d {
         q[2] = (float) rand() / (float) (RAND_MAX);
         q[3] = (float) rand() / (float) (RAND_MAX);
 
-        q *= 1.0 / cv::norm(q);
+//        q *= 1.0 / cv::norm(q);
+        q *= 1.0 / q.norm();
         q[0] = fabs(q[0]);
     }
 
@@ -634,7 +640,7 @@ namespace ppf_match_3d {
     }
 
     Mat addNoisePC(Mat pc, double scale) {
-        Mat randT = genRandomMat(pc.rows, pc.cols, 0, scale, CV_32FC1);
+        Mat randT = genRandomMat(pc.rows(), pc.cols(), 0, scale);
         return randT + pc;
     }
 
@@ -647,17 +653,25 @@ Also, view point flipping as in point cloud library is implemented
 */
 
     void meanCovLocalPC(const Mat &pc, const int point_count, Matx33d &CovMat, Vec3d &Mean) {
-        cv::calcCovarMatrix(pc.rowRange(0, point_count), CovMat, Mean, cv::COVAR_NORMAL | cv::COVAR_ROWS);
+//        cv::calcCovarMatrix(pc.rowRange(0, point_count), CovMat, Mean, cv::COVAR_NORMAL | cv::COVAR_ROWS);
+        CovMat = (pc.transpose()*pc).cast<double>();
+        Mean = (pc.colwise().sum()/(pc.rows() - 1)).cast<double>();
         CovMat *= 1.0 / (point_count - 1);
+        for (int j = 0; j < 3; ++j)
+            for (int k = 0; k < 3; ++k)
+                CovMat(j, k) -= Mean[j] * Mean[k];
     }
 
     void meanCovLocalPCInd(const Mat &pc, const int *Indices, const int point_count, Matx33d &CovMat, Vec3d &Mean) {
         int i, j, k;
-
-        CovMat = Matx33d::all(0);
-        Mean = Vec3d::all(0);
+// todo 一个非常巧妙的计算协方差矩阵方法，避免了两次遍历
+//        CovMat = Matx33d::all(0);
+//        Mean = Vec3d::all(0);
+        CovMat = Matx33d::Zero();
+        Mean   = Vec3d::Zero();
         for (i = 0; i < point_count; ++i) {
-            const float *cloud = pc.ptr<float>(Indices[i]);
+//            const float *cloud = pc.ptr<float>(Indices[i]);
+            const float *cloud = pc.data()+Indices[i];
             for (j = 0; j < 3; ++j) {
                 for (k = 0; k < 3; ++k)
                     CovMat(j, k) += cloud[j] * cloud[k];
@@ -679,11 +693,14 @@ Also, view point flipping as in point cloud library is implemented
         if (PC.cols != 3 && PC.cols != 6) // 3d data is expected
         {
             //return -1;
-            CV_Error(cv::Error::BadImageSize, "PC should have 3 or 6 elements in its columns");
+//            CV_Error(cv::Error::BadImageSize, "PC should have 3 or 6 elements in its columns");
+            std::cerr << "PC should have 3 or 6 elements in its columns" << std::endl;
         }
 
-        PCNormals.create(PC.rows, 6, CV_32F);
-        Mat PCInput = PCNormals.colRange(0, 3);
+//        PCNormals.create(PC.rows, 6, CV_32F);
+        PCNormals.resize(PC.rows(),6);
+//        Mat PCInput = PCNormals.colRange(0, 3);
+        Mat PCInput = PCNormals.leftCols(3);
         Mat Distances(PC.rows, NumNeighbors, CV_32F);
         Mat Indices(PC.rows, NumNeighbors, CV_32S);
 
@@ -698,7 +715,7 @@ Also, view point flipping as in point cloud library is implemented
 #if defined _OPENMP
 #pragma omp parallel for
 #endif
-        for (i = 0; i < PC.rows; i++) {
+        for (i = 0; i < PC.rows(); i++) {
             Matx33d C;
             Vec3d mu;
             const int *indLocal = Indices.ptr<int>(i);

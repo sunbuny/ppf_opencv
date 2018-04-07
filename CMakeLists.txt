@@ -31,3 +31,5 @@ add_executable(test_1
 add_executable(test_typedef test_typedef.cpp)
 
 add_executable(test_for_eigen main_for_eigen.cpp)
+
+add_executable(test_flann test_flann.cpp include/nanoflann.h include/utils.h)
