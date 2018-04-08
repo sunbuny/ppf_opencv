@@ -10,6 +10,9 @@
 #include <fstream>
 #include <iostream>
 #include <c_utils.h>
+#include <nanoflann.h>
+
+
 
 
 namespace ppf_match_3d {
@@ -63,13 +66,13 @@ namespace ppf_match_3d {
 
     void computeBboxStd(Mat pc, Vec2f &xRange, Vec2f &yRange, Vec2f &zRange);
 
-    void *indexPCFlann(Mat pc);
-
-    void destroyFlann(void *flannIndex);
-
-    void queryPCFlann(void *flannIndex, Mat &pc, Mat &indices, Mat &distances);
-
-    void queryPCFlann(void *flannIndex, Mat &pc, Mat &indices, Mat &distances, const int numNeighbors);
+//    void *indexPCFlann(Mat pc);
+//
+//    void destroyFlann(void *flannIndex);
+//
+//    void queryPCFlann(void *flannIndex, Mat &pc, Mat &indices, Mat &distances);
+//
+//    void queryPCFlann(void *flannIndex, Mat &pc, Mat &indices, Mat &distances, const int numNeighbors);
 
     Mat normalizePCCoeff(Mat pc, float scale, float *Cx, float *Cy, float *Cz, float *MinVal, float *MaxVal);
 

@@ -13,8 +13,8 @@ typedef Eigen::Vector3f Vec3f;
 typedef Eigen::Vector4d Vec4d;
 typedef Eigen::Matrix3d Matx33d;
 typedef Eigen::Matrix4d Matx44d;
-typedef Eigen::MatrixXf Mat;
-
+//typedef Eigen::MatrixXf Mat;
+typedef Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic,Eigen::RowMajor> Mat;
 
 namespace ppf_match_3d {
 

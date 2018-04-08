@@ -28,8 +28,20 @@ add_executable(test_1
 #        include/Precomp.h
         )
 
+add_library(test_helper
+        include/c_utils.h
+        include/PPFHelpers.h
+        src/PPFHelper.cpp)
+
 add_executable(test_typedef test_typedef.cpp)
 
 add_executable(test_for_eigen main_for_eigen.cpp)
 
 add_executable(test_flann test_flann.cpp include/nanoflann.h include/utils.h)
+
+add_executable(test_flann_eigen test_flann_eigen.cpp)
+
+add_executable(test_ppfhelper test_ppfhelper.cpp)
+target_link_libraries(test_ppfhelper test_helper)
+
+

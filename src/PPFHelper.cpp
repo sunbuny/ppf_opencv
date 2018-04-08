@@ -45,9 +45,9 @@
 
 namespace ppf_match_3d {
     // TODO flann适配
-    typedef cv::flann::L2<float> Distance_32F;
-    typedef cv::flann::GenericIndex<Distance_32F> FlannIndex;
-
+//    typedef cv::flann::L2<float> Distance_32F;
+//    typedef cv::flann::GenericIndex<Distance_32F> FlannIndex;
+    typedef nanoflann::KDTreeEigenMatrixAdaptor< Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> >  FlannIndex;
     void shuffle(int *array, size_t n);
 
     Mat genRandomMat(int rows, int cols, double mean, double stddev);
@@ -110,15 +110,17 @@ namespace ppf_match_3d {
         withNormals &= has_normals;
 
 //        cloud = Mat(numVertices, withNormals ? 6 : 3, CV_32FC1);
-        cloud = Mat.resize(numVertices, withNormals ? 6 : 3);
+        cloud = Mat(numVertices, withNormals ? 6 : 3);
 
         for (int i = 0; i < numVertices; i++) {
 //            float *data = cloud.ptr<float>(i);
-            float *data = cloud.data()+i;
+//            float *data = cloud.data()+i*(withNormals ? 6 : 3);
+            float *data = cloud.row(i).data();
             int col = 0;
             for (; col < (withNormals ? 6 : 3); ++col) {
                 ifs >> data[col];
             }
+            // 弹掉不要的
             for (; col < numCols; ++col) {
                 float tmp;
                 ifs >> tmp;
@@ -171,7 +173,7 @@ namespace ppf_match_3d {
 
         for (int pi = 0; pi < pointNum; ++pi) {
 //            const float *point = PC.ptr<float>(pi);
-            const float *point = PC.data()+pi;
+            const float *point = PC.row(pi).data();
             outFile << point[0] << " " << point[1] << " " << point[2];
 
             if (vertNum == 6) {
@@ -264,26 +266,41 @@ namespace ppf_match_3d {
         return sampledPC;
     }
 //TODO Flann
-    void *indexPCFlann(Mat pc) {
-        Mat dest_32f;
-        pc.colRange(0, 3).copyTo(dest_32f);
-        return new FlannIndex(dest_32f, cvflann::KDTreeSingleIndexParams(8));
-    }
-
-    void destroyFlann(void *flannIndex) {
-        delete ((FlannIndex *) flannIndex);
-    }
-
-// For speed purposes this function assumes that PC, Indices and Distances are created with continuous structures
-    void queryPCFlann(void *flannIndex, Mat &pc, Mat &indices, Mat &distances) {
-        queryPCFlann(flannIndex, pc, indices, distances, 1);
-    }
-
-    void queryPCFlann(void *flannIndex, Mat &pc, Mat &indices, Mat &distances, const int numNeighbors) {
-        Mat obj_32f;
-        pc.colRange(0, 3).copyTo(obj_32f);
-        ((FlannIndex *) flannIndex)->knnSearch(obj_32f, indices, distances, numNeighbors, cvflann::SearchParams(32));
-    }
+//    void *indexPCFlann(Mat pc) {
+//        Mat dest_32f;
+////        pc.colRange(0, 3).copyTo(dest_32f);
+//        dest_32f = pc.leftCols(3);
+////        return new FlannIndex(dest_32f, cvflann::KDTreeSingleIndexParams(8));
+////        return new FlannIndex(dest_32f, nanoflann::SearchParams(8));
+//        FlannIndex* res = new FlannIndex(dest_32f, 8);
+//        res->index->buildIndex();
+//        return res;
+//    }
+//
+//    void destroyFlann(void *flannIndex) {
+//        delete ((FlannIndex *) flannIndex);
+//    }
+//
+//// For speed purposes this function assumes that PC, Indices and Distances are created with continuous structures
+//    void queryPCFlann(void *flannIndex, Mat &pc, Mat &indices, Mat &distances) {
+//        queryPCFlann(flannIndex, pc, indices, distances, 1);
+//    }
+//
+//    void queryPCFlann(void *flannIndex, Mat &pc, Mat &indices, Mat &distances, const int numNeighbors) {
+//        Mat obj_32f;
+////        pc.colRange(0, 3).copyTo(obj_32f);
+//        obj_32f = pc.leftCols(3);
+////        ((FlannIndex *) flannIndex)->findNeighbors(obj_32f, indices, distances, numNeighbors, cvflann::SearchParams(32));
+//
+//        // do a knn search
+//        const size_t num_results = numNeighbors;
+//        std::vector<size_t>   ret_indexes(num_results);
+//        std::vector<float> out_dists_sqr(num_results);
+//        nanoflann::KNNResultSet<float> resultSet(num_results);
+//
+//        resultSet.init(&ret_indexes[0], &out_dists_sqr[0] );
+//        ((FlannIndex *) flannIndex)->index->findNeighbors(resultSet,)
+//    }
 
 // uses a volume instead of an octree
 // TODO: Right now normals are required.
@@ -401,7 +418,7 @@ namespace ppf_match_3d {
 
                 }
 
-                float *pcData = pcSampled.ptr<float>(c);
+                float *pcData = pcSampled.data()+c;
                 pcData[0] = (float) px;
                 pcData[1] = (float) py;
                 pcData[2] = (float) pz;
@@ -492,9 +509,9 @@ namespace ppf_match_3d {
 //        float cy = (float) cv::mean(y)[0];
 //        float cz = (float) cv::mean(z)[0];
 
-        float cx = (float) x.colwise().sum()/x.rows();
-        float cy = (float) y.colwise().sum()/y.rows();
-        float cz = (float) z.colwise().sum()/z.rows();
+        float cx = (float) x.colwise().sum()[0]/x.rows();
+        float cy = (float) y.colwise().sum()[0]/y.rows();
+        float cz = (float) z.colwise().sum()[0]/z.rows();
 
 //        cv::minMaxIdx(pc, &minVal, &maxVal);
 
@@ -562,32 +579,32 @@ namespace ppf_match_3d {
 #if defined _OPENMP
 #pragma omp parallel for
 #endif
-        for (int i = 0; i < pc.rows; i++) {
+        for (int i = 0; i < pc.rows(); i++) {
 //            const float *pcData = pc.ptr<float>(i);
             const float *pcData = pc.data()+i;
             const Vec3f n1(&pcData[3]);
 
             Vec4d p = Pose * Vec4d(pcData[0], pcData[1], pcData[2], 1);
 //            Vec3d p2(p.val);
-            Vec3d p2(p);
+            Vec3d p2(p.head(3));
             // p2[3] should normally be 1
             if (fabs(p[3]) > EPS) {
 //                Mat((1.0 / p[3]) * p2).reshape(1, 1).convertTo(pct.row(i).colRange(0, 3), CV_32F);
                 //todo Mat中插值
-                pct.row(i).head(3) =  (1.0 / p[3]) *p2;
+                pct.row(i).head(3) =  (1.0 / (float)p[3]) *p2.cast<float>();
             }
 
             // If the point cloud has normals,
             // then rotate them as well
             if (pc.cols() == 6) {
-                Vec3d n(n1), n2;
+                Vec3d n(n1.cast<double>()), n2;
 
                 n2 = R * n;
 //                double nNorm = cv::norm(n2);
                 double nNorm = n2.norm();
                 if (nNorm > EPS) {
 //                    Mat((1.0 / nNorm) * n2).reshape(1, 1).convertTo(pct.row(i).colRange(3, 6), CV_32F);
-                    pct.row(i).tail(3) = (1.0 / nNorm) * n2;
+                    pct.row(i).tail(3) = (1.0 / nNorm) * n2.cast<float>();
                 }
             }
         }
@@ -690,7 +707,7 @@ Also, view point flipping as in point cloud library is implemented
                            const Vec3f &viewpoint) {
         int i;
 
-        if (PC.cols != 3 && PC.cols != 6) // 3d data is expected
+        if (PC.cols() != 3 && PC.cols() != 6) // 3d data is expected
         {
             //return -1;
 //            CV_Error(cv::Error::BadImageSize, "PC should have 3 or 6 elements in its columns");
@@ -700,17 +717,22 @@ Also, view point flipping as in point cloud library is implemented
 //        PCNormals.create(PC.rows, 6, CV_32F);
         PCNormals.resize(PC.rows(),6);
 //        Mat PCInput = PCNormals.colRange(0, 3);
-        Mat PCInput = PCNormals.leftCols(3);
-        Mat Distances(PC.rows, NumNeighbors, CV_32F);
-        Mat Indices(PC.rows, NumNeighbors, CV_32S);
+        Mat PCInput = PC.leftCols(3);
+//        Mat Distances(PC.rows, NumNeighbors, CV_32F);
+//        Mat Indices(PC.rows, NumNeighbors, CV_32S);
 
-        PC.rowRange(0, PC.rows).colRange(0, 3).copyTo(PCNormals.rowRange(0, PC.rows).colRange(0, 3));
+//        PC.rowRange(0, PC.rows).colRange(0, 3).copyTo(PCNormals.rowRange(0, PC.rows).colRange(0, 3));
+//
+//        void *flannIndex = indexPCFlann(PCInput);
+//
+//        queryPCFlann(flannIndex, PCInput, Indices, Distances, NumNeighbors);
+//        destroyFlann(flannIndex);
+//        flannIndex = 0;
 
-        void *flannIndex = indexPCFlann(PCInput);
+        FlannIndex mat_index(PCInput, 8 /* max leaf */ );
+        mat_index.index->buildIndex(); // 初始化flann
 
-        queryPCFlann(flannIndex, PCInput, Indices, Distances, NumNeighbors);
-        destroyFlann(flannIndex);
-        flannIndex = 0;
+
 
 #if defined _OPENMP
 #pragma omp parallel for
@@ -718,21 +740,39 @@ Also, view point flipping as in point cloud library is implemented
         for (i = 0; i < PC.rows(); i++) {
             Matx33d C;
             Vec3d mu;
-            const int *indLocal = Indices.ptr<int>(i);
+//            const int *indLocal = Indices.ptr<int>(i);
+            // do a knn search
+            const size_t num_results = NumNeighbors;
+            std::vector<size_t >   ret_indexes(num_results); // 索引
+            std::vector<float> out_dists_sqr(num_results);  // 距离
+
+            nanoflann::KNNResultSet<float> resultSet(num_results);
+
+            resultSet.init(&ret_indexes[0], &out_dists_sqr[0] );
+            std::vector<float> query_pt(3);
+            Eigen::VectorXf::Map(&query_pt[0],3) = PC.row(i);
+//            std::vector<float> query_pt = PC.row(i);
+            mat_index.index->findNeighbors(resultSet, &query_pt[0], nanoflann::SearchParams(32));
 
             // compute covariance matrix
-            meanCovLocalPCInd(PCNormals, indLocal, NumNeighbors, C, mu);
+            meanCovLocalPCInd(PCNormals, (int*)ret_indexes.data(), NumNeighbors, C, mu);
 
             // eigenvectors of covariance matrix
-            Mat eigVect, eigVal;
-            eigen(C, eigVal, eigVect);
-            eigVect.row(2).convertTo(PCNormals.row(i).colRange(3, 6), CV_32F);
-
+//            Mat eigVect, eigVal;
+//            Eigen::EigenSolver<Mat> eig(C);
+//            PCNormals.row(i).tail(3) = eig.eigenvectors().col(0);
+//            eig.eigenvalues();
+//            eigen(C, eigVal, eigVect);
+//            eigVect.row(2).convertTo(PCNormals.row(i).colRange(3, 6), CV_32F);
+            Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> solver;
+            solver.compute(C, Eigen::ComputeEigenvectors);
+            PCNormals.row(i).tail(3) = solver.eigenvectors().col(0).cast<float>();
             if (FlipViewpoint) {
-                Vec3f nr(PCNormals.ptr<float>(i) + 3);
-                Vec3f pci(PCNormals.ptr<float>(i));
+                Vec3f nr(PCNormals.data() + i + 3);
+                Vec3f pci(PCNormals.data() + i);
                 flipNormalViewpoint(pci, viewpoint, nr);
-                Mat(nr).reshape(1, 1).copyTo(PCNormals.row(i).colRange(3, 6));
+//                Mat(nr).reshape(1, 1).copyTo(PCNormals.row(i).colRange(3, 6));
+                PCNormals.row(i).tail(3) = nr;
             }
         }
 
