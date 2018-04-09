@@ -47,7 +47,7 @@ namespace ppf_match_3d {
     // TODO flann适配
 //    typedef cv::flann::L2<float> Distance_32F;
 //    typedef cv::flann::GenericIndex<Distance_32F> FlannIndex;
-    typedef nanoflann::KDTreeEigenMatrixAdaptor< Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> >  FlannIndex;
+    typedef nanoflann::KDTreeEigenMatrixAdaptor< Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic,Eigen::RowMajor> >  FlannIndex;
     void shuffle(int *array, size_t n);
 
     Mat genRandomMat(int rows, int cols, double mean, double stddev);
@@ -220,7 +220,7 @@ namespace ppf_match_3d {
 
         for (int pi = 0; pi < pointNum; ++pi) {
 //            const float *point = PC.ptr<float>(pi);
-            const float *point = PC.data()+pi;
+            const float *point = PC.row(pi).data();
 
             outFile << point[0] << " " << point[1] << " " << point[2];
 
@@ -322,7 +322,7 @@ namespace ppf_match_3d {
         // OpenMP might seem like a good idea, but it didn't speed this up for me
         //#pragma omp parallel for
         for (int i = 0; i < pc.rows(); i++) {
-            const float *point = pc.data()+i;
+            const float *point = pc.row(i).data();
 
             // quantize a point
             const int xCell = (int) ((float) numSamplesDim * (point[0] - xrange[0]) / xr);
@@ -365,7 +365,7 @@ namespace ppf_match_3d {
 
                     for (int j = 0; j < cn; j++) {
                         const int ptInd = curCell[j];
-                        float *point = pc.data()+ptInd;
+                        float *point = pc.row(ptInd).data();
                         const double dx = point[0] - xc;
                         const double dy = point[1] - yc;
                         const double dz = point[2] - zc;
@@ -399,7 +399,7 @@ namespace ppf_match_3d {
                 } else {
                     for (int j = 0; j < cn; j++) {
                         const int ptInd = curCell[j];
-                        float *point = pc.data()+ptInd;
+                        float *point = pc.row(ptInd).data();
 
                         px += (double) point[0];
                         py += (double) point[1];
@@ -418,7 +418,7 @@ namespace ppf_match_3d {
 
                 }
 
-                float *pcData = pcSampled.data()+c;
+                float *pcData = pcSampled.row(c).data();
                 pcData[0] = (float) px;
                 pcData[1] = (float) py;
                 pcData[2] = (float) pz;
@@ -472,7 +472,7 @@ namespace ppf_match_3d {
         zRange[1] = points[2];
 
         for (int ind = 0; ind < num; ind++) {
-            const float *row = (float *) (pcPts.data() + (ind * pcPts.cols()));
+            const float *row = (float *) (pcPts.row(ind).data());
             const float x = row[0];
             const float y = row[1];
             const float z = row[2];
@@ -688,7 +688,7 @@ Also, view point flipping as in point cloud library is implemented
         Mean   = Vec3d::Zero();
         for (i = 0; i < point_count; ++i) {
 //            const float *cloud = pc.ptr<float>(Indices[i]);
-            const float *cloud = pc.data()+Indices[i];
+            const float *cloud = pc.row(Indices[i]).data();
             for (j = 0; j < 3; ++j) {
                 for (k = 0; k < 3; ++k)
                     CovMat(j, k) += cloud[j] * cloud[k];
@@ -717,6 +717,7 @@ Also, view point flipping as in point cloud library is implemented
 //        PCNormals.create(PC.rows, 6, CV_32F);
         PCNormals.resize(PC.rows(),6);
 //        Mat PCInput = PCNormals.colRange(0, 3);
+        PCNormals.leftCols(3) = PC.leftCols(3);
         Mat PCInput = PC.leftCols(3);
 //        Mat Distances(PC.rows, NumNeighbors, CV_32F);
 //        Mat Indices(PC.rows, NumNeighbors, CV_32S);
@@ -768,8 +769,8 @@ Also, view point flipping as in point cloud library is implemented
             solver.compute(C, Eigen::ComputeEigenvectors);
             PCNormals.row(i).tail(3) = solver.eigenvectors().col(0).cast<float>();
             if (FlipViewpoint) {
-                Vec3f nr(PCNormals.data() + i + 3);
-                Vec3f pci(PCNormals.data() + i);
+                Vec3f nr(PCNormals.row(i).data()+ 3);
+                Vec3f pci(PCNormals.row(i).data());
                 flipNormalViewpoint(pci, viewpoint, nr);
 //                Mat(nr).reshape(1, 1).copyTo(PCNormals.row(i).colRange(3, 6));
                 PCNormals.row(i).tail(3) = nr;

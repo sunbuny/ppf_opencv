@@ -193,6 +193,7 @@ namespace ppf_match_3d {
 
         // Dot product between the (viewpoint - point) and the plane normal
         cos_theta = diff.dot(n);
+//        cos_theta = vp.dot(n);
 
         // Flip the plane normal
         if (cos_theta < 0) {
