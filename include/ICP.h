@@ -2,6 +2,7 @@
 
 
 #include "Pose3D.h"
+#include <Eigen/SVD>
 #include <vector>
 
 namespace ppf_match_3d {
@@ -83,7 +84,7 @@ namespace ppf_match_3d {
            *
            *  \details It is assumed that the model is registered on the scene. Scene remains static, while the model transforms. The output poses transform the models onto the scene. Because of the point to plane minimization, the scene is expected to have the normals available. Expected to have the normals (Nx6).
            */
-        int registerModelToScene(const Mat &srcPC, const Mat &dstPC, CV_OUT double &residual, CV_OUT Matx44d &
+        int registerModelToScene(const Mat &srcPC, const Mat &dstPC,  double &residual,  Matx44d &
 
         pose);
 

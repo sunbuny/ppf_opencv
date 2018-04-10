@@ -11,6 +11,8 @@ typedef Eigen::Vector2f Vec2f;
 typedef Eigen::Vector3d Vec3d;
 typedef Eigen::Vector3f Vec3f;
 typedef Eigen::Vector4d Vec4d;
+typedef Eigen::Vector4f Vec4f;
+typedef Eigen::Vector4i Vec4i;
 typedef Eigen::Matrix3d Matx33d;
 typedef Eigen::Matrix4d Matx44d;
 //typedef Eigen::MatrixXf Mat;

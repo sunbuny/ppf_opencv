@@ -55,6 +55,7 @@ namespace ppf_match_3d {
  *  @param [in] yrange Y components (min and max) of the bounding box of the model
  *  @param [in] zrange Z components (min and max) of the bounding box of the model
  *  @param [in] sample_step_relative The point cloud is sampled such that all points
+ *  @param [in] sample_step_relative 指的是cell的大小，单位是m
  *  have a certain minimum distance. This minimum distance is determined relatively using
  *  the parameter sample_step_relative.
  *  @param [in] weightByCenter The contribution of the quantized data points can be weighted

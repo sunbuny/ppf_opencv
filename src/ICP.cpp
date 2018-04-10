@@ -38,15 +38,17 @@
 //
 // Author: Tolga Birdal <tbirdal AT gmail.com>
 
-#include "Precomp.h"
+#include <ICP.h>
+#include <THashInt.h>
+#include <PPFHelpers.h>
 
 
 namespace ppf_match_3d {
     static void subtractColumns(Mat srcPC, Vec3d &mean) {
-        int height = srcPC.rows;
+        int height = srcPC.rows();
 
         for (int i = 0; i < height; i++) {
-            float *row = srcPC.ptr<float>(i);
+            float *row = srcPC.row(i).data();
             {
                 row[0] -= (float) mean[0];
                 row[1] -= (float) mean[1];
@@ -57,12 +59,12 @@ namespace ppf_match_3d {
 
 // as in PCA
     static void computeMeanCols(Mat srcPC, Vec3d &mean) {
-        int height = srcPC.rows;
+        int height = srcPC.rows();
 
         double mean1 = 0, mean2 = 0, mean3 = 0;
 
         for (int i = 0; i < height; i++) {
-            const float *row = srcPC.ptr<float>(i);
+            const float *row = srcPC.row(i).data();
             {
                 mean1 += (double) row[0];
                 mean2 += (double) row[1];
@@ -88,11 +90,11 @@ namespace ppf_match_3d {
 
 // compute the average distance to the origin
     static double computeDistToOrigin(Mat srcPC) {
-        int height = srcPC.rows;
+        int height = srcPC.rows();
         double dist = 0;
 
         for (int i = 0; i < height; i++) {
-            const float *row = srcPC.ptr<float>(i);
+            const float *row = srcPC.row(i).data();
             dist += sqrt(row[0] * row[0] + row[1] * row[1] + row[2] * row[2]);
         }
 
@@ -181,27 +183,30 @@ namespace ppf_match_3d {
 // Kok Lim Low's linearization
     static void minimizePointToPlaneMetric(Mat Src, Mat Dst, Vec3d &rpy, Vec3d &t) {
         //Mat sub = Dst - Src;
-        Mat A = Mat(Src.rows, 6, CV_64F);
-        Mat b = Mat(Src.rows, 1, CV_64F);
+        Mat A = Mat(Src.rows(), 6);
+        Mat b = Mat(Src.rows(), 1);
         Mat rpy_t;
 
 #if defined _OPENMP
 #pragma omp parallel for
 #endif
-        for (int i = 0; i < Src.rows; i++) {
-            const Vec3d srcPt(Src.ptr<double>(i));
-            const Vec3d dstPt(Dst.ptr<double>(i));
-            const Vec3d normals(Dst.ptr<double>(i) + 3);
+        for (int i = 0; i < Src.rows(); i++) {
+            const Vec3d srcPt(Src.row(i).data());
+            const Vec3d dstPt(Dst.row(i).data());
+            const Vec3d normals(Dst.row(i).data() + 3);
             const Vec3d sub = dstPt - srcPt;
             const Vec3d axis = srcPt.cross(normals);
 
-            *b.ptr<double>(i) = sub.dot(normals);
-            hconcat(axis.reshape<1, 3>(), normals.reshape<1, 3>(), A.row(i));
+            *b.row(i) = sub.dot(normals);
+//            hconcat(axis.reshape<1, 3>(), normals.reshape<1, 3>(), A.row(i));
+            A.row(i).head(3) = axis;
+            A.row(i).tail(3) = normals;
         }
 
-        cv::solve(A, b, rpy_t, DECOMP_SVD);
-        rpy_t.rowRange(0, 3).copyTo(rpy);
-        rpy_t.rowRange(3, 6).copyTo(t);
+//        cv::solve(A, b, rpy_t, DECOMP_SVD);
+        rpy_t = A.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(b))
+        rpy_t.col(0).head(3).copyTo(rpy);
+        rpy_t.col(0).tail(3).copyTo(t);
     }
 
     static void getTransformMat(Vec3d &euler, Vec3d &t, Matx44d &Pose) {
@@ -226,12 +231,12 @@ make sure that the max element in array will not exceed maxElement
 
 // source point clouds are assumed to contain their normals
     int ICP::registerModelToScene(const Mat &srcPC, const Mat &dstPC, double &residual, Matx44d &pose) {
-        int n = srcPC.rows;
+        int n = srcPC.rows();
 
         const bool useRobustReject = m_rejectionScale > 0;
 
-        Mat srcTemp = srcPC.clone();
-        Mat dstTemp = dstPC.clone();
+        Mat srcTemp = srcPC;
+        Mat dstTemp = dstPC;
         Vec3d meanSrc, meanDst;
         computeMeanCols(srcTemp, meanSrc);
         computeMeanCols(dstTemp, meanDst);
@@ -244,16 +249,18 @@ make sure that the max element in array will not exceed maxElement
 
         double scale = (double) n / ((distSrc + distDst) * 0.5);
 
-        srcTemp(cv::Range(0, srcTemp.rows), cv::Range(0, 3)) *= scale;
-        dstTemp(cv::Range(0, dstTemp.rows), cv::Range(0, 3)) *= scale;
+//        srcTemp(cv::Range(0, srcTemp.rows), cv::Range(0, 3)) *= scale;
+//        dstTemp(cv::Range(0, dstTemp.rows), cv::Range(0, 3)) *= scale;
+        srcTemp.leftCols(3) *= scale;
+        dstTemp.leftCols(3) *= scale;
 
         Mat srcPC0 = srcTemp;
         Mat dstPC0 = dstTemp;
 
         // initialize pose
-        pose = Matx44d::eye();
+        pose = Matx44d::Identity();
 
-        Mat M = Mat::eye(4, 4, CV_64F);
+        Mat M = Mat::Identity(4, 4);
 
         double tempResidual = 0;
 
@@ -263,14 +270,14 @@ make sure that the max element in array will not exceed maxElement
             const double impact = 2;
             double div = pow((double) impact, (double) level);
             //double div2 = div*div;
-            const int numSamples = cvRound((double) (n / (div)));
+            const int numSamples = static_cast<const int>(round((double) (n / (div))));
             const double TolP = m_tolerance * (double) (level + 1) * (level + 1);
-            const int MaxIterationsPyr = cvRound((double) m_maxIterations / (level + 1));
+            const int MaxIterationsPyr = static_cast<const int>(round((double) m_maxIterations / (level + 1)));
 
             // Obtain the sampled point clouds for this level: Also rotates the normals
             Mat srcPCT = transformPCPose(srcPC0, pose);
 
-            const int sampleStep = cvRound((double) n / (double) numSamples);
+            const int sampleStep = static_cast<const int>(round((double) n / (double) numSamples));
 
             srcPCT = samplePCUniform(srcPCT, sampleStep);
             /*
@@ -278,22 +285,22 @@ make sure that the max element in array will not exceed maxElement
             Hamdi Sahloul, however, noticed that accuracy increased (pose residual decreased slightly).
             */
             Mat dstPCS = samplePCUniform(dstPC0, sampleStep);
-            void *flann = indexPCFlann(dstPCS);
+//            void *flann = indexPCFlann(dstPCS);
 
             double fval_old = 9999999999;
             double fval_perc = 0;
             double fval_min = 9999999999;
-            Mat Src_Moved = srcPCT.clone();
+            Mat Src_Moved = srcPCT;
 
             int i = 0;
 
-            size_t numElSrc = (size_t) Src_Moved.rows;
+            size_t numElSrc = (size_t) Src_Moved.rows();
             int sizesResult[2] = {(int) numElSrc, 1};
             float *distances = new float[numElSrc];
             int *indices = new int[numElSrc];
 
-            Mat Indices(2, sizesResult, CV_32S, indices, 0);
-            Mat Distances(2, sizesResult, CV_32F, distances, 0);
+//            Mat Indices(2, sizesResult, CV_32S, indices, 0);
+//            Mat Distances(2, sizesResult, CV_32F, distances, 0);
 
             // use robust weighting for outlier treatment
             int *indicesModel = new int[numElSrc];
@@ -442,7 +449,7 @@ make sure that the max element in array will not exceed maxElement
 #pragma omp parallel for
 #endif
         for (int i = 0; i < (int) poses.size(); i++) {
-            Matx44d poseICP = Matx44d::eye();
+            Matx44d poseICP = Matx44d::Identity();
             Mat srcTemp = transformPCPose(srcPC, poses[i]->pose);
             registerModelToScene(srcTemp, dstPC, poses[i]->residual, poseICP);
             poses[i]->appendPose(poseICP);

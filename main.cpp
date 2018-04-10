@@ -1,86 +1,144 @@
+//
+//  IMPORTANT: READ BEFORE DOWNLOADING, COPYING, INSTALLING OR USING.
+//
+//  By downloading, copying, installing or using the software you agree to this license.
+//  If you do not agree to this license, do not download, install,
+//  copy or use the software.
+//
+//
+//                          License Agreement
+//                For Open Source Computer Vision Library
+//
+// Copyright (C) 2014, OpenCV Foundation, all rights reserved.
+// Third party copyrights are property of their respective owners.
+//
+// Redistribution and use in source and binary forms, with or without modification,
+// are permitted provided that the following conditions are met:
+//
+//   * Redistribution's of source code must retain the above copyright notice,
+//     this list of conditions and the following disclaimer.
+//
+//   * Redistribution's in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//
+//   * The name of the copyright holders may not be used to endorse or promote products
+//     derived from this software without specific prior written permission.
+//
+// This software is provided by the copyright holders and contributors "as is" and
+// any express or implied warranties, including, but not limited to, the implied
+// warranties of merchantability and fitness for a particular purpose are disclaimed.
+// In no event shall the Intel Corporation or contributors be liable for any direct,
+// indirect, incidental, special, exemplary, or consequential damages
+// (including, but not limited to, procurement of substitute goods or services;
+// loss of use, data, or profits; or business interruption) however caused
+// and on any theory of liability, whether in contract, strict liability,
+// or tort (including negligence or otherwise) arising in any way out of
+// the use of this software, even if advised of the possibility of such damage.
+//
+// Author: Tolga Birdal <tbirdal AT gmail.com>
+
+#include "PPFMatch3D.h"
 #include <iostream>
-#include <iomanip>
-//#include <c_utils.h>
-#include <hash_murmur.h>
-#include <Pose3D.h>
+#include "PPFHelpers.h"
 
 
-#pragma ide diagnostic ignored "CannotResolve"
-int main() {
-    Vec3d v,v1;
-    v.fill(1);
-    v1.fill(2);
-    ppf_match_3d::TNormalize3(v);
-    ppf_match_3d::TNormalize3(v1);
-    std::cout << "TNormalize3 " << v << std::endl;
-    double ans = ppf_match_3d::TAngle3Normalized(v,v);
-    std::cout << "TAngle3Normalized " << ans << std::endl;
-    std::cout << std::setprecision(20) <<  "v.dot(v1) " << v.dot(v1) << std::endl;
+using namespace std;
 
-    Matx33d R = Eigen::AngleAxisd(M_PI/3,Eigen::Vector3d::UnitX()).matrix();
-    Vec3d   t;
-    t.fill(1);
-    Matx44d pose;
-    ppf_match_3d::rtToPose(R,t,pose);
-    std::cout << "rtToPose: " << pose << std::endl;
-    Matx33d R_tmp;
-    ppf_match_3d::poseToR(pose,R_tmp);
-    std::cout << "poseToR: " << R_tmp <<std::endl;
-    Vec3d t_tmp;
-    ppf_match_3d::poseToRT(pose,R_tmp,t_tmp);
-    std::cout << "pose to R t: " << R_tmp << std::endl << t_tmp <<std::endl;
+using namespace ppf_match_3d;
+
+static void help(const string& errorMessage)
+{
+    cout << "Program init error : "<< errorMessage << endl;
+    cout << "\nUsage : ppf_matching [input model file] [input scene file]"<< endl;
+    cout << "\nPlease start again with new parameters"<< endl;
+}
+
+int main(int argc, char** argv)
+{
+    // welcome message
+    cout << "****************************************************" << endl;
+    cout << "* Surface Matching demonstration : demonstrates the use of surface matching"
+            " using point pair features." << endl;
+    cout << "* The sample loads a model and a scene, where the model lies in a different"
+            " pose than the training.\n* It then trains the model and searches for it in the"
+            " input scene. The detected poses are further refined by ICP\n* and printed to the "
+            " standard output." << endl;
+    cout << "****************************************************" << endl;
+
+    if (argc < 3)
     {
-        Vec3d axis = Eigen::Vector3d::UnitX();
-        double angle = M_PI/6;
-        Matx33d R;
-        ppf_match_3d::aaToR(axis,angle,R);
-        std::cout << "aaToR: " << R <<std::endl;
-        std::cout << "eigen: " << Eigen::AngleAxisd(angle,axis).matrix() << std::endl;
+        help("Not enough input arguments");
+        exit(1);
     }
 
-    {
-        double angle = M_PI/6;
-        Matx33d R;
-        ppf_match_3d::getUnitXRotation(angle,R);
-        std::cout << "getUnitXRotation: " << R <<std::endl;
+#if (defined __x86_64__ || defined _M_X64)
+    cout << "Running on 64 bits" << endl;
+#else
+    cout << "Running on 32 bits" << endl;
+#endif
+
+#ifdef _OPENMP
+    cout << "Running with OpenMP" << endl;
+#else
+    cout << "Running without OpenMP and without TBB" << endl;
+#endif
+
+    string modelFileName = (string)argv[1];
+    string sceneFileName = (string)argv[2];
+
+    Mat pc = loadPLYSimple(modelFileName.c_str(), 1);
+
+    // Now train the model
+    cout << "Training..." << endl;
+
+    ppf_match_3d::PPF3DDetector detector(0.05, 0.05);
+    detector.trainModel(pc);
+
+
+
+    // Read the scene
+    Mat pcTest = loadPLYSimple(sceneFileName.c_str(), 1);
+
+    // Match the model to the scene and get the pose
+    cout << endl << "Starting matching..." << endl;
+    vector<Pose3DPtr> results;
+
+    detector.match(pcTest, results, 1.0/40.0, 0.05);
+
+
+
+    //check results size from match call above
+    size_t results_size = results.size();
+    cout << "Number of matching poses: " << results_size;
+    if (results_size == 0) {
+        cout << endl << "No matching poses found. Exiting." << endl;
+        exit(0);
     }
 
-    {
-        Matx33d R = Eigen::AngleAxisd(M_PI/3,Eigen::Vector3d::UnitX()).matrix();
-        Vec3d axis;
-        double angle;
-        ppf_match_3d::dcmToAA(R,axis,&angle);
-        std::cout << "dcmToAA: axis :" << axis << std::endl << " angle: " << angle << std::endl;
+    // Get only first N results - but adjust to results size if num of results are less than that specified by N
+    size_t N = 2;
+    if (results_size < N) {
+        cout << endl << "Reducing matching poses to be reported (as specified in code): "
+             << N << " to the number of matches found: " << results_size << endl;
+        N = results_size;
+    }
+    vector<Pose3DPtr> resultsSub(results.begin(),results.begin()+N);
 
-        Matx33d R_tmp;
-        ppf_match_3d::aaToDCM(axis,angle,R_tmp);
-        std::cout << "aaToDCM: " <<R << std::endl<<"----------" << std::endl<<R_tmp << std::endl;
+    cout << "Poses: " << endl;
+    // debug first five poses
+    for (size_t i=0; i<resultsSub.size(); i++)
+    {
+        Pose3DPtr result = resultsSub[i];
+        cout << "Pose Result " << i << endl;
+        result->printPose();
+        if (i==0)
+        {
+            Mat pct = transformPCPose(pc, result->pose);
+            writePLY(pct, "para6700PCTrans.ply");
+        }
     }
 
-    {
-        uint32_t *key = new uint32_t [4];             /* input scalar */
-//    char key[4] = {0};
-        key[0] = static_cast<uint32_t>(floor(1));
-        key[1] = static_cast<uint32_t>(floor(1));
-        key[2] = static_cast<uint32_t>(floor(1));
-        key[3] = static_cast<uint32_t>(floor(1));
-
-
-        uint32_t* outMatrix = new uint32_t [4];              /* output matrix */
-
-
-        ppf_match_3d::hashMurmurx64(key,16,42,outMatrix);
-        std::cout << *outMatrix <<std::endl;
-    }
-
-    {
-        ppf_match_3d::Pose3DPtr pose3DPtr = std::make_shared<ppf_match_3d::Pose3D>();
-        pose3DPtr->numVotes = 0;
-        pose3DPtr->printPose();
-    }
-
-    {
-
-    }
     return 0;
+
 }

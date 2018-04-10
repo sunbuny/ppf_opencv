@@ -81,8 +81,8 @@ namespace ppf_match_3d {
               */
             void match(const Mat& scene, std::vector<Pose3DPtr> &results, const double relativeSceneSampleStep=1.0/5.0, const double relativeSceneDistance=0.03);
 
-            void read(const FileNode& fn);
-            void write(FileStorage& fs) const;
+//            void read(const FileNode& fn);
+//            void write(FileStorage& fs) const;
 
             protected:
 
